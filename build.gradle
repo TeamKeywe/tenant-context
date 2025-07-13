@@ -1,0 +1,78 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'com.diffplug.spotless' version '6.25.0'
+}
+
+group = 'com.doubleo'
+version = '0.0.2'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // 공통 필터 및 서블릿 처리용
+    api 'org.springframework:spring-web:6.1.6'
+    // WebFlux (Gateway용)
+    api 'org.springframework:spring-webflux:6.1.6'
+    // Spring Boot 자동 구성 지원 (for @ConditionalOnWebApplication)
+    api 'org.springframework.boot:spring-boot-autoconfigure:3.2.4'
+    // 서블릿 API
+    compileOnly 'jakarta.servlet:jakarta.servlet-api:6.0.0'
+    // 어노테이션 프로세서 관련 (선택)
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'tenant-context'
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/TeamDoubleO/tenant-context") // 예시
+            credentials {
+                username = System.getenv("GIT_USERNAME")
+                password = System.getenv("GIT_PASSWORD")
+            }
+        }
+    }
+}
+
+spotless {
+    java {
+        googleJavaFormat().aosp()
+        importOrder()
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+tasks.register('updateGitHooks', Copy) {
+    from('./scripts/') {
+        include 'pre-commit'
+        include 'prepare-commit-msg'
+    }
+    into './.git/hooks'
+}
+
+tasks.register('makeGitHooksExecutable', Exec) {
+    commandLine 'chmod', '+x', './.git/hooks/pre-commit', './.git/hooks/prepare-commit-msg'
+    dependsOn updateGitHooks
+}
+
+compileJava.dependsOn makeGitHooksExecutable
